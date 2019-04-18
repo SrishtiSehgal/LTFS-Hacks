@@ -130,17 +130,70 @@ def credit_risk(df, name):
 	df.loc[df[name].str.contains('Low Risk'), name] = 'Low Risk'
 	df.loc[df[name].str.contains('High Risk'), name] = 'High Risk'
 	df.loc[df[name].str.contains('Medium Risk'), name] = 'Medium Risk'
-	return salary_type(df, name)
+	df[name] = df[name].map({'Very Low-Risk': 1, 'Low Risk': 2, 'Not Scored': 3, 
+			   'Medium Risk': 4, 'High Risk': 5, 'Very High-Risk': 6})
 
+########################################################################
+#NORMALIZING DATASET
+########################################################################
+def pseudo_norm(X_data, mean, std): #normalize nominal X given the mean and std
+	X_data = (X_data-mean)/std
+	return X_data
+
+def norm(X):
+	avg = np.mean(X.values, axis = 0)
+	stdev = np.std(X.values, axis = 0)
+	X = (X-avg)/stdev
+	print([i for i in range(stdev.shape[0]) if stdev[i]==0])
+
+	np.savetxt('stats_avg.csv', avg, delimiter=',', fmt = '%f')
+	np.savetxt('stats_std.csv', stdev, delimiter=',',fmt = '%f')
+		
+	print('normalized file and saved its stats')
+	return X, avg, stdev
 ########################################################################
 #CALLING FUNCTIONS TO MANIPULATE DATAFRAME
 ########################################################################
 
+#read file
 file = read_csv('train.csv')
 eliminate_NULL(file, 'Employment.Type')
+Y = file['loan_default']
+
+#preprocessing training
+file = file.drop(['loan_default'],axis=1)
+file = file.drop(['MobileNo_Avl_Flag'], axis=1) #invariant
 file = date_to_age(file, 'Date.of.Birth', 'AGE')
 file = date_to_age(file, 'DisbursalDate', 'DAYS_DISBURSAL', datatype='days')
 file = salary_type(file, 'Employment.Type')
-file = credit_risk(file, 'PERFORM_CNS.SCORE.DESCRIPTION')
+credit_risk(file, 'PERFORM_CNS.SCORE.DESCRIPTION')
 time_elapsed(file, 'AVERAGE.ACCT.AGE')
 time_elapsed(file, 'CREDIT.HISTORY.LENGTH')
+
+#separate encoded categorical from cts variables
+names_non_flags = list(file)
+flags = ['Aadhar_flag','PAN_flag','VoterID_flag', 'Driving_flag','Passport_flag','Salaried','Self employed']
+for flag in flags:
+	names_non_flags.remove(flag)
+
+#normalize training
+X, avg, stdev = norm(file[names_non_flags])
+X = X.join(file[flags])
+
+#read test file
+test = read_csv('test-file.csv')
+
+#preprocessing test
+test = test.drop(['MobileNo_Avl_Flag'], axis=1) #invariant
+test = date_to_age(test, 'Date.of.Birth', 'AGE')
+test = date_to_age(test, 'DisbursalDate', 'DAYS_DISBURSAL', datatype='days')
+test = salary_type(test, 'Employment.Type')
+credit_risk(test, 'PERFORM_CNS.SCORE.DESCRIPTION')
+time_elapsed(test, 'AVERAGE.ACCT.AGE')
+time_elapsed(test, 'CREDIT.HISTORY.LENGTH')
+
+#pseudo-normalize test
+X_test = pseudo_norm(test[names_non_flags], avg, stdev)
+X_test = X_test.join(test[flags])
+
+#READY FOR FEATURE SELECTION!
