@@ -291,3 +291,6 @@ X = X.drop(['DAYS_DISBURSAL'], axis=1)
 X_test = X_test.drop(['DAYS_DISBURSAL'], axis=1)
 X = X.drop(['Employee_code_ID'], axis=1)
 X_test = X_test.drop(['Employee_code_ID'], axis=1) 
+
+X.to_csv('trainingSet.csv', sep='\t', encoding='utf-8')
+X_test.to_csv('testingSet.csv', sep='\t', encoding='utf-8')
