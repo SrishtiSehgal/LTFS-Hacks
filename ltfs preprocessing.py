@@ -15,14 +15,18 @@
 #https://towardsdatascience.com/predicting-loan-repayment-5df4e0023e92
 #https://medium.com/@andrejusb/machine-learning-date-feature-transformation-explained-4feb774c9dbe
 #https://stats.stackexchange.com/questions/105959/best-way-to-turn-a-date-into-a-numerical-feature
+#https://machinelearningmastery.com/feature-selection-machine-learning-python/
+#https://towardsdatascience.com/smarter-ways-to-encode-categorical-data-for-machine-learning-part-1-of-3-6dca2f71b159
+#https://towardsdatascience.com/understanding-feature-engineering-part-2-categorical-data-f54324193e63
 ########################################################################
 #IMPORTS
 ########################################################################
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
-import os
-from datetime import datetime
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+
 ########################################################################
 #READ FILE, STATE columns with NULLS
 ########################################################################
@@ -51,7 +55,7 @@ def eliminate_NULL(df, name):
 ########################################################################
 #CONVERT DATE STAMPS TO NANOSECONDS 04/21/19 12AM: 1555804800000000000ns
 ########################################################################
-def date_to_age(df, name, new_name, datatype='year'):
+def date_to_age(df, name, new_name, f=True, datatype='year'):
 	'''
 	INPUTS
 	pd_col: column containing date values
@@ -60,16 +64,19 @@ def date_to_age(df, name, new_name, datatype='year'):
 	col: new column containing time in years
 	'''
 
-	df1 = pd.to_datetime(df[name], format='%d-%m-%y')
 	col_today = pd.to_datetime('20190101')
-	for i in range(len(df1.index)):
-		if 2020 <= df1.iloc[i].year <= 2068:
-			df1.iloc[i] = df1.iloc[i] - pd.DateOffset(years=100)
+	if f:
+		df1 = pd.to_datetime(df[name], format='%d-%m-%y')
+		for i in range(len(df1.index)):
+			if 2020 <= df1.iloc[i].year <= 2068:
+				df1.iloc[i] = df1.iloc[i] - pd.DateOffset(years=100)
+	else:
+			df1 = pd.to_datetime(df[name])
+	
 	if datatype is not 'year':
 			df[new_name] = (col_today - df1).dt.days
 	else:
 		df[new_name] = round((col_today - df1).dt.days/365,1)#new_col
-	df=df.drop([name], axis=1)
 	return df
 
 ########################################################################
@@ -134,7 +141,7 @@ def credit_risk(df, name):
 			   'Medium Risk': 4, 'High Risk': 5, 'Very High-Risk': 6})
 
 ########################################################################
-#NORMALIZING DATASET
+#NORMALIZATION
 ########################################################################
 def pseudo_norm(X_data, mean, std): #normalize nominal X given the mean and std
 	X_data = (X_data-mean)/std
@@ -149,8 +156,60 @@ def norm(X):
 	np.savetxt('stats_avg.csv', avg, delimiter=',', fmt = '%f')
 	np.savetxt('stats_std.csv', stdev, delimiter=',',fmt = '%f')
 		
-	print('normalized file and saved its stats')
 	return X, avg, stdev
+
+#######################################################################################
+# PCA
+#######################################################################################
+def determine_PCA(train_X):
+	def	plot_feature_importance(PC_info, PC_eigenvector):
+		index = np.arange(len(PC_eigenvector))
+		bar_width = 0.35
+		opacity = 0.4
+		fig, ax = plt.subplots(figsize=(10,8))
+		rects1 = ax.bar(index, PC_eigenvector, 
+						bar_width,
+						alpha=opacity, 
+						color='b',
+						label='PCA')
+
+		ax.set_xlabel('Features', fontsize=10)
+		ax.set_ylabel('Eigenvalues', fontsize=10)
+		ax.set_title('Importance of Features in Dataset\n'+PC_info)
+		ax.set_xticks(index + bar_width / 2)
+		ax.set_xticklabels(list(train_X), fontsize=10, rotation=90)
+		ax.legend()
+		fig.tight_layout()
+		plt.show()
+		plt.close()
+	def plot_features(components):
+		colors = plt.cm.viridis(np.linspace(0,1,components.shape[0]))
+#		plt.gca().set_prop_cycle(plt.cycler('color', plt.cm.viridis(np.linspace(0,1,components.shape[0]))))
+#		plt.figure(figsize=(20,10))
+		fig, ax = plt.subplots(figsize=(20, 10))
+		for i, component in enumerate(components):
+			if i < 40:
+				plt.plot(component, color = colors[i], label='Component no. '+str(i))
+#		plt.xlabel('Features')
+#		plt.ylabel('Eigenvalues')
+		ax.set_xticks(np.arange(components.shape[1]))
+		ax.set_xticklabels(list(train_X), rotation=90)
+		ax.set_xlabel('Features', fontsize=10)
+		ax.set_ylabel('Eigenvalues', fontsize=10)
+#		ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+		plt.legend(fontsize='small')
+		plt.show()
+		
+	for numPC in {21, 30}:
+		pca = PCA(n_components=numPC)
+		PCs = pca.fit(train_X.values)
+		var_ratio = sorted(pca.explained_variance_ratio_, reverse=True)
+		print(str(numPC) +'PCs retained '+str(sum(var_ratio)*100)+'% of information')
+		for i in range(3):
+			plot_feature_importance('PC at row {} \nPC variance: {}\n total variance: {}\n {} total PCs'.format(
+				str(i),str(var_ratio[i]), str(sum(var_ratio)), str(numPC)), 
+				abs(pca.components_[i,:]))
+
 ########################################################################
 #CALLING FUNCTIONS TO MANIPULATE DATAFRAME
 ########################################################################
@@ -164,7 +223,11 @@ Y = file['loan_default']
 file = file.drop(['loan_default'],axis=1)
 file = file.drop(['MobileNo_Avl_Flag'], axis=1) #invariant
 file = date_to_age(file, 'Date.of.Birth', 'AGE')
-file = date_to_age(file, 'DisbursalDate', 'DAYS_DISBURSAL', datatype='days')
+file = date_to_age(file, 'DisbursalDate', 'DAYS_DISBURSAL', f=False, datatype='days')
+#only data points where date of disbursement > DOB (cannot recieve loan if not born!)
+file = file[file['DisbursalDate']>=file['Date.of.Birth']] 
+file = file.drop(['Date.of.Birth'], axis=1)
+file = file.drop(['DisbursalDate'], axis=1)
 file = salary_type(file, 'Employment.Type')
 credit_risk(file, 'PERFORM_CNS.SCORE.DESCRIPTION')
 time_elapsed(file, 'AVERAGE.ACCT.AGE')
@@ -182,11 +245,22 @@ X = X.join(file[flags])
 
 #read test file
 test = read_csv('test-file.csv')
+eliminate_NULL(test, 'Employment.Type')
 
 #preprocessing test
 test = test.drop(['MobileNo_Avl_Flag'], axis=1) #invariant
 test = date_to_age(test, 'Date.of.Birth', 'AGE')
-test = date_to_age(test, 'DisbursalDate', 'DAYS_DISBURSAL', datatype='days')
+test = date_to_age(test, 'DisbursalDate', 'DAYS_DISBURSAL', f=False, datatype='days')
+#only data points where date of disbursement > DOB (cannot recieve loan if not born!)
+test = test[test['DisbursalDate']>=test['Date.of.Birth']] 
+test = test.drop(['Date.of.Birth'], axis=1)
+test = test.drop(['DisbursalDate'], axis=1)
+'''
+the disbursement date is the date that a school credits a student’s account 
+at the school or pays a student or parent borrower directly with Title IV 
+funds received from the U.S. Department of Education (the Department) 
+or with institutional funds in advance of receiving Title IV program funds.
+'''
 test = salary_type(test, 'Employment.Type')
 credit_risk(test, 'PERFORM_CNS.SCORE.DESCRIPTION')
 time_elapsed(test, 'AVERAGE.ACCT.AGE')
@@ -197,3 +271,23 @@ X_test = pseudo_norm(test[names_non_flags], avg, stdev)
 X_test = X_test.join(test[flags])
 
 #READY FOR FEATURE SELECTION!
+determine_PCA(X)
+X = X.drop(['Passport_flag'], axis=1)
+X_test = X_test.drop(['Passport_flag'], axis=1)
+X = X.drop(['Driving_flag'], axis=1)
+X_test = X_test.drop(['Driving_flag'], axis=1)
+X = X.drop(['VoterID_flag'], axis=1)
+X_test = X_test.drop(['VoterID_flag'], axis=1)
+X = X.drop(['PAN_flag'], axis=1)
+X_test = X_test.drop(['PAN_flag'], axis=1)
+X = X.drop(['Aadhar_flag'], axis=1)
+X_test = X_test.drop(['Aadhar_flag'], axis=1)
+X = X.drop(['Salaried'], axis=1)
+X_test = X_test.drop(['Salaried'], axis=1)
+X = X.drop(['Self employed'], axis=1)
+X_test = X_test.drop(['Self employed'], axis=1) 
+#maybe?
+X = X.drop(['DAYS_DISBURSAL'], axis=1)
+X_test = X_test.drop(['DAYS_DISBURSAL'], axis=1)
+X = X.drop(['Employee_code_ID'], axis=1)
+X_test = X_test.drop(['Employee_code_ID'], axis=1) 
