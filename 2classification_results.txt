@@ -1,0 +1,12 @@
+===== DATA INFORMATION =====
+training data size: 183677 by 31
+test data size: 83483 by 31
+failed points in training: 40644
+
+===== RANDOM FOREST CLASSIFIER =====
+
+TRAINING
+	 	 | failure | healthy |
+predicted failure | 36320	|	47|
+predicted healthy | 4324	|	142986|
+-------------------------------------------------------------
