@@ -40,8 +40,11 @@ def read_csv(filename):
 	-print out number of null values per column
 	'''
 
-	return pd.read_csv(filename, sep=',').drop(
-		['UniqueID'], axis=1)
+	file = pd.read_csv(filename, sep=',')
+#	IDs = file['UniqueID']
+#	file = file.drop(
+#		['UniqueID'], axis=1)
+	return file
 
 ########################################################################
 #ELIMINATE ROWS WITH NULL VALUES
@@ -184,19 +187,14 @@ def determine_PCA(train_X):
 		plt.close()
 	def plot_features(components):
 		colors = plt.cm.viridis(np.linspace(0,1,components.shape[0]))
-#		plt.gca().set_prop_cycle(plt.cycler('color', plt.cm.viridis(np.linspace(0,1,components.shape[0]))))
-#		plt.figure(figsize=(20,10))
 		fig, ax = plt.subplots(figsize=(20, 10))
 		for i, component in enumerate(components):
 			if i < 40:
 				plt.plot(component, color = colors[i], label='Component no. '+str(i))
-#		plt.xlabel('Features')
-#		plt.ylabel('Eigenvalues')
 		ax.set_xticks(np.arange(components.shape[1]))
 		ax.set_xticklabels(list(train_X), rotation=90)
 		ax.set_xlabel('Features', fontsize=10)
 		ax.set_ylabel('Eigenvalues', fontsize=10)
-#		ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 		plt.legend(fontsize='small')
 		plt.show()
 		
@@ -211,16 +209,19 @@ def determine_PCA(train_X):
 				abs(pca.components_[i,:]))
 
 ########################################################################
+#DATASET STATS
+########################################################################
+def data_stats(target_data):
+	return len(target_data[target_data==1].index)
+
+########################################################################
 #CALLING FUNCTIONS TO MANIPULATE DATAFRAME
 ########################################################################
-
 #read file
 file = read_csv('train.csv')
 eliminate_NULL(file, 'Employment.Type')
-Y = file['loan_default']
 
 #preprocessing training
-file = file.drop(['loan_default'],axis=1)
 file = file.drop(['MobileNo_Avl_Flag'], axis=1) #invariant
 file = date_to_age(file, 'Date.of.Birth', 'AGE')
 file = date_to_age(file, 'DisbursalDate', 'DAYS_DISBURSAL', f=False, datatype='days')
@@ -229,6 +230,9 @@ file = file[file['DisbursalDate']>=file['Date.of.Birth']]
 file = file.drop(['Date.of.Birth'], axis=1)
 file = file.drop(['DisbursalDate'], axis=1)
 file = salary_type(file, 'Employment.Type')
+Y = file['loan_default']
+file = file.drop(['loan_default'],axis=1)
+file = file.drop(['UniqueID'],axis=1)
 credit_risk(file, 'PERFORM_CNS.SCORE.DESCRIPTION')
 time_elapsed(file, 'AVERAGE.ACCT.AGE')
 time_elapsed(file, 'CREDIT.HISTORY.LENGTH')
@@ -265,13 +269,15 @@ test = salary_type(test, 'Employment.Type')
 credit_risk(test, 'PERFORM_CNS.SCORE.DESCRIPTION')
 time_elapsed(test, 'AVERAGE.ACCT.AGE')
 time_elapsed(test, 'CREDIT.HISTORY.LENGTH')
-
+IDs = test['UniqueID']
+test = test.drop(['UniqueID'],axis=1)
 #pseudo-normalize test
 X_test = pseudo_norm(test[names_non_flags], avg, stdev)
 X_test = X_test.join(test[flags])
 
 #READY FOR FEATURE SELECTION!
-determine_PCA(X)
+#determine_PCA(X)
+#POST FEATURE SELECTION
 X = X.drop(['Passport_flag'], axis=1)
 X_test = X_test.drop(['Passport_flag'], axis=1)
 X = X.drop(['Driving_flag'], axis=1)
@@ -287,10 +293,16 @@ X_test = X_test.drop(['Salaried'], axis=1)
 X = X.drop(['Self employed'], axis=1)
 X_test = X_test.drop(['Self employed'], axis=1) 
 #maybe?
-X = X.drop(['DAYS_DISBURSAL'], axis=1)
-X_test = X_test.drop(['DAYS_DISBURSAL'], axis=1)
-X = X.drop(['Employee_code_ID'], axis=1)
-X_test = X_test.drop(['Employee_code_ID'], axis=1) 
+#X = X.drop(['DAYS_DISBURSAL'], axis=1)
+#X_test = X_test.drop(['DAYS_DISBURSAL'], axis=1)
+#X = X.drop(['Employee_code_ID'], axis=1)
+#X_test = X_test.drop(['Employee_code_ID'], axis=1) 
 
-X.to_csv('trainingSet.csv', sep='\t', encoding='utf-8')
-X_test.to_csv('testingSet.csv', sep='\t', encoding='utf-8')
+# X.to_csv('trainingSet.csv', sep=',', encoding='utf-8')
+# X_test.to_csv('testingSet.csv', sep=',', encoding='utf-8')
+
+default_training = data_stats(Y)
+    
+import Classifiers as models
+
+models.classification(X.values, Y.values, X_test.values, default_training,IDs)
