@@ -37,7 +37,6 @@ def read_csv(filename):
 
 	OUTPUT
 	df: pandas matrix of file
-	-print out number of null values per column
 	'''
 
 	file = pd.read_csv(filename, sep=',')
@@ -50,6 +49,16 @@ def read_csv(filename):
 #ELIMINATE ROWS WITH NULL VALUES
 ########################################################################
 def eliminate_NULL(df, name):
+	'''
+	INPUTS
+	df: dataframe of data
+	name: the column that contains NA values
+
+	OUTPUT
+	-modified df to remove rows that contained NA values
+	-print out number of null values per column
+	'''
+
 	df.dropna(subset=[name], inplace=True)
 	print("Sum of null values in each feature:\n")
 	print(f"{df.isnull().sum()}")
@@ -61,10 +70,14 @@ def eliminate_NULL(df, name):
 def date_to_age(df, name, new_name, f=True, datatype='year'):
 	'''
 	INPUTS
-	pd_col: column containing date values
+	df: dataframe of data
+	name: the column that contains date values
+	new_name: new column name that will contain the modified date rep
+	f: based on style of date formating. True = %d-%m-%y
+	datatype: if date formatting is to be year or in days
 
 	OUTPUT
-	col: new column containing time in years
+	df: modifed df with new column containing new date rep for col-name
 	'''
 
 	col_today = pd.to_datetime('20190101')
@@ -89,9 +102,10 @@ def salary_type(df, name):
 	'''
 	INPUTS
 	df: dataframe of data
+	name: the column that contains data to be encoded
 
 	OUTPUT
-	(df) modified dataframe with one hot encoding for salary
+	df: modified dataframe with one hot encoding
 	'''
 	sal_le, sal_ohe = LabelEncoder(), OneHotEncoder()
 	sal_labels = sal_le.fit_transform(df[name])
@@ -105,12 +119,13 @@ def salary_type(df, name):
 #CONVERT time elapsed columns into months
 ########################################################################
 def time_elapsed(df, name):
-	'''
+	''''
 	INPUTS
-	pd_col: column containing elapsed time information as strings
-
+	df: dataframe of data
+	name: the column that contains date values
+	
 	OUTPUT
-	pd_col: same column now with values in terms of months
+	-modifed df with new column containing new date rep for col-name
 	'''
 	df[name]=df[name].str.replace('yrs', '', regex=False)
 	df[name]=df[name].str.replace('mon', '', regex=False)
@@ -121,12 +136,13 @@ def time_elapsed(df, name):
 #CONVERT BUREAU CREDIT RISK CATEGORIES INTO FLAGS
 ########################################################################
 def credit_risk(df, name):
-	'''
+'''
 	INPUTS
 	df: dataframe of data
-
+	name: the column that contains date values
+	
 	OUTPUT
-	pd_col: same column now with values as flags...note the categories
+	-modifed df to rewrite strings in a certain way, then create a label
 	'''
 	df[name]=df[name].str.replace('No Bureau History Available', 'Not Scored', regex=False)
 	df[name]=df[name].str.replace('Not Scored: Not Enough Info available on the customer', 'Not Scored', regex=False)
@@ -147,10 +163,28 @@ def credit_risk(df, name):
 #NORMALIZATION
 ########################################################################
 def pseudo_norm(X_data, mean, std): #normalize nominal X given the mean and std
+	'''
+	INPUTS
+	X_data: data to be pseduonormed
+	mean: mean of data
+	std: std of data
+
+	OUTPUT
+	X_data: psudonormed data
+	'''
 	X_data = (X_data-mean)/std
 	return X_data
 
 def norm(X):
+	'''
+	INPUTS
+	X: data to be normalized
+
+	OUTPUT
+	X: psudonormed data
+	mean: mean of data
+	std: std of data
+	'''
 	avg = np.mean(X.values, axis = 0)
 	stdev = np.std(X.values, axis = 0)
 	X = (X-avg)/stdev
@@ -212,6 +246,12 @@ def determine_PCA(train_X):
 #DATASET STATS
 ########################################################################
 def data_stats(target_data):
+	'''
+	INPUTS
+	target_data: Y-values for the dataset
+	OUTPUT
+	-number of objects labelled as 1 (loan-defaulted)
+	'''
 	return len(target_data[target_data==1].index)
 
 ########################################################################
